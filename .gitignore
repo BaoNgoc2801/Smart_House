@@ -26,8 +26,7 @@ __pycache__/
 # Other
 *.log
 
-# Large Datasets and Models
-data/
-models/
-results/
-notebooks/
+# Ignore leftover checkpoints/caches that might get recreated
+.ipynb_checkpoints/
+__pycache__/
+

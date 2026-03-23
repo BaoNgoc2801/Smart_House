@@ -43,7 +43,7 @@ app.add_middleware(
 # =========================
 # Household configurations
 # =========================
-HOUSEHOLDS = ["hh121", "hh122", "hh124"]
+HOUSEHOLDS = ["hh124"]
 
 # =========================
 # Cache
