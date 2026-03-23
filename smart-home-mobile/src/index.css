@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+
+  --color-bg-light: #f3f4f6;
+  --color-bg-dark: #111827;
+  --color-card-light: #ffffff;
+  --color-card-dark: #1f2937;
+}
+
+@layer base {
+  body {
+    @apply bg-bg-light text-gray-900;
+  }
+}
+
+/* Custom utilities */
+@utility glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}

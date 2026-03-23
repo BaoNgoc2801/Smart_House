@@ -1,0 +1,33 @@
+# Root .gitignore
+
+# Node/Frontend
+node_modules/
+dist/
+build/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python/Backend
+venv/
+__pycache__/
+*.pyc
+.env
+
+# IDEs and OS
+.DS_Store
+.idea/
+.vscode/
+
+# Other
+*.log
+
+# Large Datasets and Models
+data/
+models/
+results/
+notebooks/

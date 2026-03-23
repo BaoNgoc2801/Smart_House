@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "1ebe8cf2-e3e7-4b6a-9d32-9b802791c657"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.baongoc28012004.smarthomemobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+[
+  {
+    "household": "hh121",
+    "dataset_percentage": 30.0,
+    "samples_used": 17368,
+    "accuracy": 0.8641335636154289,
+    "training_time": 66.61287093162537,
+    "timestamp": "2026-01-08T20:57:31.317339",
+    "model_type": "Ensemble (LGBM + RF)",
+    "use_smote": false,
+    "n_features": 18
+  },
+  {
+    "household": "hh121",
+    "dataset_percentage": 90.0,
+    "samples_used": 52106,
+    "accuracy": 0.8860103626943006,
+    "training_time": 76.72129416465759,
+    "timestamp": "2026-01-08T21:00:15.635167",
+    "model_type": "Ensemble (LGBM + RF)",
+    "use_smote": false,
+    "n_features": 18
+  }
+]
