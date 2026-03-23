@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { DEVICE_POSITIONS } from '../constants/floorplan';
+import floorplanImage from '../assets/img/hh124.png';
 import { DeviceNode } from '../components/shared/DeviceNode';
 import { fetchDeviceStates, sendDeviceCommand, triggerPrediction } from '../services/api';
 import { useTextToSpeech } from '../hooks/useTextToSpeech';
@@ -241,7 +242,7 @@ export function HomeDemo() {
          <div className="relative w-full max-w-4xl aspect-[4/3] bg-white rounded-xl shadow-inner border border-slate-100 overflow-hidden mix-blend-multiply">
             {/* The Image */}
             <img 
-               src="/src/assets/img/hh124.png" 
+               src={floorplanImage} 
                alt="Household Floorplan" 
                className="absolute inset-0 w-full h-full object-contain opacity-80"
             />

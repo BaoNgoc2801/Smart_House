@@ -1,8 +1,5 @@
 import type { DeviceCommand, PredictionPayload } from '../types';
-
-// Depending on where this runs (device vs browser), localhost might need to be specific.
-// Using default loopback or local network IP. Please change to local IP for physical devices.
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { API_BASE_URL } from '../constants/config';
 
 export async function fetchHealth() {
   const res = await fetch(`${API_BASE_URL}/health`);

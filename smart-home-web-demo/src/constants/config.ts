@@ -1,5 +1,7 @@
-export const API_BASE_URL = 'http://localhost:8000';
-export const WS_BASE_URL = 'ws://localhost:8000';
+/// <reference types="vite/client" />
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+// Automatically derive WS base URL from API base URL (http -> ws, https -> wss)
+export const WS_BASE_URL = API_BASE_URL.replace(/^http/, 'ws');
 
 export const DEFAULT_HOUSEHOLD: 'hh124' = 'hh124';
-

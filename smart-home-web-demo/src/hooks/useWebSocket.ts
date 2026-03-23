@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import type { WsMessage } from '../types';
-import { API_BASE_URL, sendDeviceCommand } from '../services/api';
+import { sendDeviceCommand } from '../services/api';
+import { API_BASE_URL } from '../constants/config';
 import { getPredictionMessage } from '../utils/predictionMessages';
 import { ACTIVITY_DEVICE_MAP_HH124 } from '../utils/activityMap';
 
