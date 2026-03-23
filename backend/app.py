@@ -152,6 +152,7 @@ async def send_expo_push(
             resp = {"text": r.text}
         return {"ok": True, "status": r.status_code, "resp": resp}
 
+
 # Utilities
 def _clear_household_cache(household: str) -> None:
     pkg_cache.pop(household, None)
@@ -278,7 +279,6 @@ def nearest_index_by_time_of_day(
             ),
         )
 
-    # Parse the requested time
     try:
         parsed = pd.to_datetime(time_str, format="%H:%M:%S", errors="raise")
         req_seconds = parsed.hour * 3600 + parsed.minute * 60 + parsed.second
@@ -287,18 +287,17 @@ def nearest_index_by_time_of_day(
             parsed = pd.to_datetime(time_str, format="%H:%M", errors="raise")
             req_seconds = parsed.hour * 3600 + parsed.minute * 60
         except Exception:
-            raise HTTPException(status_code=400, detail=f"Invalid time format: '{time_str}'. Expected HH:MM or HH:MM:SS.")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid time format: '{time_str}'. Expected HH:MM or HH:MM:SS.",
+            )
 
     valid_mask = ~df_time.isna()
     if not bool(valid_mask.any()):
         raise HTTPException(status_code=400, detail="Time column exists but could not be parsed (all NaT).")
 
     valid_times = df_time[valid_mask]
-
-    # Convert all timestamps to seconds-of-day
     row_seconds = valid_times.dt.hour * 3600 + valid_times.dt.minute * 60 + valid_times.dt.second
-
-    # Compute circular distance (wraps around midnight)
     diff = (row_seconds - req_seconds).abs()
     circular_diff = diff.apply(lambda d: min(d, 86400 - d))
 
@@ -744,8 +743,7 @@ class PredictRequest(BaseModel):
     timestamp: Optional[str] = None
     date: Optional[str] = None
     time: Optional[str] = None
-    # NEW: time-of-day only matching (ignores date)
-    time_only: Optional[str] = None   # format: "HH:MM" or "HH:MM:SS"
+    time_only: Optional[str] = None  # format: "HH:MM" or "HH:MM:SS"
 
 
 class TrainRequest(BaseModel):
@@ -841,7 +839,6 @@ async def predict(req: PredictRequest) -> Dict[str, Any]:
 
     out: Optional[Dict[str, Any]] = None
 
-    # NEW: time_only — match by time-of-day, ignoring date
     if req.time_only is not None:
         idx, clamp_flag, ts_eff = nearest_index_by_time_of_day(req.time_only, time_info)
         row = df.iloc[idx]
@@ -880,10 +877,8 @@ async def predict(req: PredictRequest) -> Dict[str, Any]:
             detail="Provide one of: time_only (HH:MM or HH:MM:SS), index, timestamp, or (date + time)."
         )
 
-    # Broadcast to WebSocket clients
     await ws_broadcast(household, {"type": "prediction", "payload": out})
 
-    # Optional: push notification for Sleep
     if out.get("activity") == "Sleep" and (out.get("confidence") or 0) >= 0.75:
         await send_expo_push(
             household,
