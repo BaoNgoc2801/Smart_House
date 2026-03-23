@@ -21,10 +21,8 @@ export function HomeDemo() {
   const [predictionTime, setPredictionTime] = useState<string>('');
   const [isPredicting, setIsPredicting] = useState(false);
   
-  // Ref to track last spoken prediction to avoid duplicates on fast re-renders
   const lastSpokenPredictionRef = useRef<string | null>(null);
 
-  // Initial Data Load
   useEffect(() => {
     async function loadStates() {
       try {
@@ -47,7 +45,6 @@ export function HomeDemo() {
      }
   };
 
-  // Listen for new predictions and trigger speech/notifications
   const latestPrediction = predictions.length > 0 ? predictions[0] : null;
   
   useEffect(() => {
