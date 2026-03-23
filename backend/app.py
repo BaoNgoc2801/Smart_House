@@ -27,8 +27,8 @@ from pydantic import BaseModel, Field
 # Paths / App
 # =========================
 BASE_DIR = Path(__file__).resolve().parent
-MODELS_DIR = BASE_DIR / "backend" / "models" / "households"
-DATA_DIR = BASE_DIR / "backend" / "data" / "processed"
+MODELS_DIR = BASE_DIR / "models" / "households"
+DATA_DIR = BASE_DIR / "data" / "processed"
 
 app = FastAPI(title="SmartHome Activity API")
 
