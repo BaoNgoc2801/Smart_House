@@ -1,0 +1,56 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate:
+    name: Validate Changed Projects
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Detect Changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend: 'backend/**'
+            web: 'smart-home-web-demo/**'
+            mobile: 'smart-home-mobile/**'
+
+      - name: Setup Python
+        if: steps.filter.outputs.backend == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Check Backend
+        if: steps.filter.outputs.backend == 'true'
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # Add pytest commands here when tests are written
+
+      - name: Setup Node
+        if: steps.filter.outputs.web == 'true' || steps.filter.outputs.mobile == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check Web Demo
+        if: steps.filter.outputs.web == 'true'
+        run: |
+          cd smart-home-web-demo
+          npm install
+          npm run build
+
+      - name: Check Mobile
+        if: steps.filter.outputs.mobile == 'true'
+        run: |
+          cd smart-home-mobile
+          npm install
+          npm run build
