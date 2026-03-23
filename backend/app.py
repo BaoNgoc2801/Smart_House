@@ -72,9 +72,7 @@ EXPO_PUSH_TOKENS: Dict[str, Set[str]] = {}
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 EXPO_ACCESS_TOKEN = os.getenv("EXPO_ACCESS_TOKEN", "")
 
-# =========================
 # Device state (mock/in-memory)
-# =========================
 DEVICE_STATES: Dict[str, Dict[str, str]] = {}
 
 
@@ -154,10 +152,7 @@ async def send_expo_push(
             resp = {"text": r.text}
         return {"ok": True, "status": r.status_code, "resp": resp}
 
-
-# =========================
 # Utilities
-# =========================
 def _clear_household_cache(household: str) -> None:
     pkg_cache.pop(household, None)
     data_cache.pop(household, None)
@@ -311,9 +306,7 @@ def nearest_index_by_time_of_day(
     return best_pos, None, time_str
 
 
-# =========================
 # Data / Model loading
-# =========================
 def load_household_data(household: str) -> pd.DataFrame:
     if household in data_cache:
         return data_cache[household]
@@ -404,9 +397,7 @@ def load_household_pkg(household: str) -> Dict[str, Any]:
     return pkg
 
 
-# =========================
 # Decoding helpers
-# =========================
 def decode_label(x: Any, activity_map: Optional[Dict[int, str]], label_encoder: Any = None) -> str:
     try:
         x_int = int(x)
@@ -494,9 +485,7 @@ def align_features(X: pd.DataFrame, expected: Optional[List[str]]) -> Tuple[pd.D
     return X2, exp
 
 
-# =========================
 # Prediction
-# =========================
 def predict_row(
     household: str,
     row: pd.Series,
