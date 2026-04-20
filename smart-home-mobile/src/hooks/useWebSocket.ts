@@ -5,7 +5,7 @@ import { API_BASE_URL, sendDeviceCommand } from '../services/api';
 import { getPredictionMessage } from '../utils/predictionMessages';
 import { ACTIVITY_DEVICE_MAP_HH124 } from '../utils/activityMap';
 
-const WS_URL = API_BASE_URL.replace(/^https?/, (match) => match === 'https' ? 'wss' : 'ws');
+const WS_URL = API_BASE_URL.replace(/^https?/, (match: string) => match === 'https' ? 'wss' : 'ws');
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
