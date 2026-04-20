@@ -834,72 +834,105 @@ def get_dashboard_data(household: str) -> Dict[str, Any]:
     if household not in HOUSEHOLDS:
         raise HTTPException(status_code=400, detail=f"Invalid household: {household}")
 
-    df = load_household_data(household)
-    time_info = get_time_info(household, df)
-    time_col = time_info["time_col"]
-    if not time_col:
-        raise HTTPException(status_code=400, detail="No time column found for aggregation")
+    try:
+        df = load_household_data(household)
+        time_info = get_time_info(household, df)
+        time_col = time_info["time_col"]
+        if not time_col:
+            raise HTTPException(status_code=400, detail="No time column found for aggregation")
 
-    df_time = pd.to_datetime(df[time_col], errors="coerce")
-    df_valid = df[~df_time.isna()].copy()
-    # Format Date as string to avoid JSON serialization issues
-    df_valid['Date'] = df_time[~df_time.isna()].dt.strftime('%m-%d')
+        # Parse timestamps
+        df_ts = pd.to_datetime(df[time_col], errors="coerce")
+        mask = ~df_ts.isna()
+        df_valid = df[mask].copy()
+        df_valid['_ts'] = df_ts[mask]
 
-    # Define activity groups
-    sitting_acts = ['Watch_TV', 'Read', 'Work_On_Computer', 'Work_At_Table', 'Phone']
-    active_acts = ['Cook_Dinner', 'Wash_Dishes', 'Personal_Hygiene', 'Dress', 'Wash_Breakfast_Dishes', 'Wash_Dinner_Dishes', 'Work']
-    sleep_acts = ['Sleep', 'Sleep_Out_Of_Bed']
-    wakeup_acts = ['Bed_Toilet_Transition']
+        if len(df_valid) == 0:
+            raise HTTPException(status_code=400, detail="No valid timestamps in dataset")
 
-    # Group by Date
-    daily_stats = df_valid.groupby('Date').apply(
-        lambda g: pd.Series({
-            'Sitting_Duration': g[g['Activity'].isin(sitting_acts)]['Event_Duration'].sum() / 3600.0,
-            'Walking_Duration': g[g['Activity'].isin(active_acts)]['Event_Duration'].sum() / 3600.0,
-            'Sleeping_Duration': g[g['Activity'].isin(sleep_acts)]['Event_Duration'].sum() / 3600.0,
-            'Wakeup_Count': len(g[g['Activity'].isin(wakeup_acts)]),
-        })
-    ).reset_index()
+        # Compute event duration as the time diff to the NEXT event (seconds)
+        # Last event in dataset gets duration 0
+        df_valid = df_valid.sort_values('_ts').reset_index(drop=True)
+        df_valid['Event_Duration'] = df_valid['_ts'].diff(periods=-1).abs().dt.total_seconds().fillna(0)
 
-    # Get last 30 days
-    daily_stats = daily_stats.sort_values('Date').tail(30).reset_index(drop=True)
+        # Cap individual event durations at 1 hour to avoid huge gaps skewing results
+        df_valid['Event_Duration'] = df_valid['Event_Duration'].clip(upper=3600)
 
-    sitting, walking, wakeup, sleeping, alerts = [], [], [], [], []
+        # Extract date string for grouping
+        df_valid['Date'] = df_valid['_ts'].dt.strftime('%m-%d')
 
-    for i, row in daily_stats.iterrows():
-        day_str = row['Date']
-        
-        # Sitting
-        s_val = float(row['Sitting_Duration'])
-        s_anom = s_val > 10.0
-        if s_anom: alerts.append(f"Unusual sitting duration ({s_val:.1f}h) on {day_str}.")
-        sitting.append({"day": day_str, "value": s_val, "isAnomaly": s_anom})
+        # Check that Activity column exists
+        if 'Activity' not in df_valid.columns:
+            raise HTTPException(status_code=500, detail="Activity column not found in dataset")
 
-        # Walking (Active)
-        w_val = float(row['Walking_Duration'])
-        w_anom = w_val < 0.2 and s_val > 0  # Only anomaly if they are active but very low
-        if w_anom: alerts.append(f"Low active duration ({w_val:.1f}h) on {day_str}.")
-        walking.append({"day": day_str, "value": w_val, "isAnomaly": w_anom})
+        # Define activity groups
+        sitting_acts = ['Watch_TV', 'Read', 'Work_On_Computer', 'Work_At_Table', 'Phone']
+        active_acts = ['Cook_Dinner', 'Wash_Dishes', 'Personal_Hygiene', 'Dress',
+                       'Wash_Breakfast_Dishes', 'Wash_Dinner_Dishes', 'Work']
+        sleep_acts = ['Sleep', 'Sleep_Out_Of_Bed']
+        wakeup_acts = ['Bed_Toilet_Transition']
 
-        # Wakeup
-        wu_val = float(row['Wakeup_Count'])
-        wu_anom = wu_val > 3
-        if wu_anom: alerts.append(f"High wakeup count ({int(wu_val)}) on {day_str}.")
-        wakeup.append({"day": day_str, "value": wu_val, "isAnomaly": wu_anom})
+        # Group by Date
+        daily_stats = df_valid.groupby('Date').apply(
+            lambda g: pd.Series({
+                'Sitting_Duration': g.loc[g['Activity'].isin(sitting_acts), 'Event_Duration'].sum() / 3600.0,
+                'Walking_Duration': g.loc[g['Activity'].isin(active_acts), 'Event_Duration'].sum() / 3600.0,
+                'Sleeping_Duration': g.loc[g['Activity'].isin(sleep_acts), 'Event_Duration'].sum() / 3600.0,
+                'Wakeup_Count': len(g[g['Activity'].isin(wakeup_acts)]),
+            }),
+            include_groups=False,
+        ).reset_index()
 
-        # Sleeping
-        sl_val = float(row['Sleeping_Duration'])
-        sl_anom = sl_val > 0 and (sl_val < 4 or sl_val > 12)
-        if sl_anom: alerts.append(f"Abnormal sleeping duration ({sl_val:.1f}h) on {day_str}.")
-        sleeping.append({"day": day_str, "value": sl_val, "isAnomaly": sl_anom})
+        # Get last 30 days
+        daily_stats = daily_stats.sort_values('Date').tail(30).reset_index(drop=True)
 
-    return {
-        "sitting": sitting,
-        "walking": walking,
-        "wakeup": wakeup,
-        "sleeping": sleeping,
-        "alerts": alerts[-4:] if alerts else ["No recent anomalies detected."]
-    }
+        sitting, walking, wakeup, sleeping, alerts = [], [], [], [], []
+
+        for _, row in daily_stats.iterrows():
+            day_str = row['Date']
+
+            # Sitting
+            s_val = float(row['Sitting_Duration'])
+            s_anom = s_val > 10.0
+            if s_anom:
+                alerts.append(f"Unusual sitting duration ({s_val:.1f}h) on {day_str}.")
+            sitting.append({"day": day_str, "value": round(s_val, 2), "isAnomaly": s_anom})
+
+            # Walking (Active)
+            w_val = float(row['Walking_Duration'])
+            w_anom = w_val < 0.2 and s_val > 0
+            if w_anom:
+                alerts.append(f"Low active duration ({w_val:.1f}h) on {day_str}.")
+            walking.append({"day": day_str, "value": round(w_val, 2), "isAnomaly": w_anom})
+
+            # Wakeup
+            wu_val = float(row['Wakeup_Count'])
+            wu_anom = wu_val > 3
+            if wu_anom:
+                alerts.append(f"High wakeup count ({int(wu_val)}) on {day_str}.")
+            wakeup.append({"day": day_str, "value": wu_val, "isAnomaly": wu_anom})
+
+            # Sleeping
+            sl_val = float(row['Sleeping_Duration'])
+            sl_anom = sl_val > 0 and (sl_val < 4 or sl_val > 12)
+            if sl_anom:
+                alerts.append(f"Abnormal sleeping duration ({sl_val:.1f}h) on {day_str}.")
+            sleeping.append({"day": day_str, "value": round(sl_val, 2), "isAnomaly": sl_anom})
+
+        return {
+            "sitting": sitting,
+            "walking": walking,
+            "wakeup": wakeup,
+            "sleeping": sleeping,
+            "alerts": alerts[-4:] if alerts else ["No recent anomalies detected."]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Dashboard processing error: {str(e)}")
 
 
 @app.post("/predict")
