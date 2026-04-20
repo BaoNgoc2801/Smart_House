@@ -16,12 +16,19 @@ export function AppShell() {
           </div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900">SmartHome Demo</h1>
         </div>
-        <div className="flex items-center gap-4 text-sm font-medium text-slate-600">
-           <span>Live Dashboard</span>
-           <span className="flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-           </span>
+        <div className="flex items-center gap-6 text-sm font-medium">
+           <div className="flex items-center gap-4 bg-slate-100 px-3 py-1.5 rounded-full text-slate-600">
+             <a href="/demo" className="hover:text-blue-600 transition-colors">Home Demo</a>
+             <div className="w-px h-4 bg-slate-300"></div>
+             <a href="/dashboard" className="hover:text-blue-600 transition-colors">Elderly Care</a>
+           </div>
+           <div className="flex items-center gap-2 text-slate-600">
+             <span>Live Dashboard</span>
+             <span className="flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+             </span>
+           </div>
         </div>
       </header>
 

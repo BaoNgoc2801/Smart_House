@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 # =========================
 BASE_DIR = Path(__file__).resolve().parent
 MODELS_DIR = BASE_DIR / "models" / "households"
-DATA_DIR = BASE_DIR / "data" / "processed"
+DATA_DIR = BASE_DIR.parent / "data" / "processed"
 
 app = FastAPI(title="SmartHome Activity API")
 
@@ -87,21 +87,24 @@ async def ws_broadcast(household: str, payload: Dict[str, Any]) -> None:
 
 @app.websocket("/ws/{household}")
 async def ws_endpoint(ws: WebSocket, household: str):
+    await ws.accept()
     if household not in HOUSEHOLDS:
-        await ws.accept()
-        await ws.close(code=1008)
+        await ws.close(code=1008, reason="Invalid household")
         return
 
-    await ws.accept()
     WS_CONNECTIONS.setdefault(household, set()).add(ws)
 
     try:
+        # Send a connection success message to help clients debug connection setup
+        await ws.send_json({"type": "connection", "status": "connected", "household": household})
         while True:
             await ws.receive_text()
     except WebSocketDisconnect:
-        WS_CONNECTIONS.get(household, set()).discard(ws)
+        if ws in WS_CONNECTIONS.get(household, set()):
+            WS_CONNECTIONS[household].discard(ws)
     except Exception:
-        WS_CONNECTIONS.get(household, set()).discard(ws)
+        if ws in WS_CONNECTIONS.get(household, set()):
+            WS_CONNECTIONS[household].discard(ws)
 
 
 @app.post("/push/register")
@@ -824,6 +827,79 @@ def get_devices_state(household: str) -> Dict[str, Any]:
     if household not in HOUSEHOLDS:
         raise HTTPException(status_code=400, detail=f"Invalid household: {household}")
     return {"household": household, "devices": DEVICE_STATES.get(household, {})}
+
+
+@app.get("/dashboard/{household}")
+def get_dashboard_data(household: str) -> Dict[str, Any]:
+    if household not in HOUSEHOLDS:
+        raise HTTPException(status_code=400, detail=f"Invalid household: {household}")
+
+    df = load_household_data(household)
+    time_info = get_time_info(household, df)
+    time_col = time_info["time_col"]
+    if not time_col:
+        raise HTTPException(status_code=400, detail="No time column found for aggregation")
+
+    df_time = pd.to_datetime(df[time_col], errors="coerce")
+    df_valid = df[~df_time.isna()].copy()
+    # Format Date as string to avoid JSON serialization issues
+    df_valid['Date'] = df_time[~df_time.isna()].dt.strftime('%m-%d')
+
+    # Define activity groups
+    sitting_acts = ['Watch_TV', 'Read', 'Work_On_Computer', 'Work_At_Table', 'Phone']
+    active_acts = ['Cook_Dinner', 'Wash_Dishes', 'Personal_Hygiene', 'Dress', 'Wash_Breakfast_Dishes', 'Wash_Dinner_Dishes', 'Work']
+    sleep_acts = ['Sleep', 'Sleep_Out_Of_Bed']
+    wakeup_acts = ['Bed_Toilet_Transition']
+
+    # Group by Date
+    daily_stats = df_valid.groupby('Date').apply(
+        lambda g: pd.Series({
+            'Sitting_Duration': g[g['Activity'].isin(sitting_acts)]['Event_Duration'].sum() / 3600.0,
+            'Walking_Duration': g[g['Activity'].isin(active_acts)]['Event_Duration'].sum() / 3600.0,
+            'Sleeping_Duration': g[g['Activity'].isin(sleep_acts)]['Event_Duration'].sum() / 3600.0,
+            'Wakeup_Count': len(g[g['Activity'].isin(wakeup_acts)]),
+        })
+    ).reset_index()
+
+    # Get last 30 days
+    daily_stats = daily_stats.sort_values('Date').tail(30).reset_index(drop=True)
+
+    sitting, walking, wakeup, sleeping, alerts = [], [], [], [], []
+
+    for i, row in daily_stats.iterrows():
+        day_str = row['Date']
+        
+        # Sitting
+        s_val = float(row['Sitting_Duration'])
+        s_anom = s_val > 10.0
+        if s_anom: alerts.append(f"Unusual sitting duration ({s_val:.1f}h) on {day_str}.")
+        sitting.append({"day": day_str, "value": s_val, "isAnomaly": s_anom})
+
+        # Walking (Active)
+        w_val = float(row['Walking_Duration'])
+        w_anom = w_val < 0.2 and s_val > 0  # Only anomaly if they are active but very low
+        if w_anom: alerts.append(f"Low active duration ({w_val:.1f}h) on {day_str}.")
+        walking.append({"day": day_str, "value": w_val, "isAnomaly": w_anom})
+
+        # Wakeup
+        wu_val = float(row['Wakeup_Count'])
+        wu_anom = wu_val > 3
+        if wu_anom: alerts.append(f"High wakeup count ({int(wu_val)}) on {day_str}.")
+        wakeup.append({"day": day_str, "value": wu_val, "isAnomaly": wu_anom})
+
+        # Sleeping
+        sl_val = float(row['Sleeping_Duration'])
+        sl_anom = sl_val > 0 and (sl_val < 4 or sl_val > 12)
+        if sl_anom: alerts.append(f"Abnormal sleeping duration ({sl_val:.1f}h) on {day_str}.")
+        sleeping.append({"day": day_str, "value": sl_val, "isAnomaly": sl_anom})
+
+    return {
+        "sitting": sitting,
+        "walking": walking,
+        "wakeup": wakeup,
+        "sleeping": sleeping,
+        "alerts": alerts[-4:] if alerts else ["No recent anomalies detected."]
+    }
 
 
 @app.post("/predict")
