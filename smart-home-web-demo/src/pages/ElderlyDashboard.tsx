@@ -7,6 +7,7 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid
 export function ElderlyDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchElderlyDashboardData('Patient A')
@@ -15,15 +16,33 @@ export function ElderlyDashboard() {
         setLoading(false);
       })
       .catch(err => {
-        console.error(err);
+        const msg = err?.message ?? 'Failed to load dashboard data';
+        setError(msg);
+        console.error('[Dashboard]', msg);
         setLoading(false);
       });
   }, []);
 
   if (loading || !data) {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-full min-h-[400px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      );
+    }
     return (
-      <div className="flex items-center justify-center h-full min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 max-w-md text-center">
+          <p className="text-red-700 font-bold text-lg mb-2">Failed to Load Dashboard</p>
+          <p className="text-red-500 text-sm">{error ?? 'Backend may still be deploying. Please wait a moment and refresh.'}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
