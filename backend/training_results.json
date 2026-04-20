@@ -1,0 +1,13 @@
+[
+  {
+    "household": "hh124",
+    "dataset_percentage": 100.0,
+    "samples_used": 5241,
+    "accuracy": 0.9523355576739753,
+    "training_time": 27.107303857803345,
+    "timestamp": "2026-04-05T22:19:18.780008",
+    "model_type": "Ensemble (LGBM + RF)",
+    "use_smote": false,
+    "n_features": 19
+  }
+]

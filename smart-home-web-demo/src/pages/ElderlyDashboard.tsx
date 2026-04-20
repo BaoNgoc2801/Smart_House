@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchElderlyDashboardData } from '../services/elderlyApi';
 import type { DashboardData } from '../services/elderlyApi';
-import { AlertCircle, Activity, Bed, Moon, Users, TrendingUp, Armchair, Footprints } from 'lucide-react';
+import { AlertCircle, Bed, Moon, Users, TrendingUp, Armchair, Footprints } from 'lucide-react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 
 export function ElderlyDashboard() {
