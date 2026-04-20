@@ -18,8 +18,8 @@ export function HomeDemo() {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
     'Notification' in window ? Notification.permission : 'denied'
   );
-  const [predictionTime, setPredictionTime] = useState<string>('');
   const [isPredicting, setIsPredicting] = useState(false);
+  const [predictionError, setPredictionError] = useState<string | null>(null);
   
   const lastSpokenPredictionRef = useRef<string | null>(null);
 
@@ -98,13 +98,18 @@ export function HomeDemo() {
   };
 
   const requestPrediction = async () => {
-    if (!predictionTime) return;
     setIsPredicting(true);
+    setPredictionError(null);
     try {
-      // The websocket will broadcast the prediction back to us eventually
-      await triggerPrediction({ household, time_only: predictionTime });
-    } catch (err) {
-      console.error('Failed to trigger prediction', err);
+      const now = new Date();
+      const h = now.getHours().toString().padStart(2, '0');
+      const m = now.getMinutes().toString().padStart(2, '0');
+      const timeOnly = `${h}:${m}`;
+      await triggerPrediction({ household, time_only: timeOnly });
+    } catch (err: any) {
+      const msg = err?.message ?? 'Prediction failed';
+      setPredictionError(msg);
+      console.error('[Predict]', msg);
     } finally {
       setIsPredicting(false);
     }
@@ -147,21 +152,21 @@ export function HomeDemo() {
            </div>
         </section>
 
-        {/* Time input for prediction */}
-        <div className="flex items-center gap-2 mb-4">
-          <input
-            type="time"
-            value={predictionTime}
-            onChange={(e) => setPredictionTime(e.target.value)}
-            className="px-2 py-1 border rounded bg-white/70 backdrop-blur-sm"
-          />
+        {/* Predict Now Button */}
+        <div className="flex flex-col gap-2 mb-2">
           <button
             onClick={requestPrediction}
-            disabled={isPredicting || !predictionTime}
-            className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isPredicting}
+            className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition disabled:opacity-50 text-sm font-semibold"
           >
-            {isPredicting ? 'Predicting...' : 'Predict'}
+            <Activity size={15} className={isPredicting ? 'animate-spin' : ''} />
+            {isPredicting ? 'Predicting...' : 'Predict Now (current time)'}
           </button>
+          {predictionError && (
+            <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2 border border-red-100">
+              {predictionError}
+            </p>
+          )}
         </div>
 
         {/* AI Prediction Panel */}

@@ -1,5 +1,5 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Bell, LayoutGrid } from 'lucide-react';
+import { Home, Bell, LayoutGrid, Pill } from 'lucide-react';
 import { ToastContainer } from '../components/shared/ToastContainer';
 import { cn } from '../utils/cn';
 import { useAppStore } from '../store/useAppStore';
@@ -16,6 +16,7 @@ export function AppShell() {
   const navItems = [
     { label: 'Home', path: '/dashboard', icon: Home },
     { label: 'Rooms', path: '/rooms', icon: LayoutGrid },
+    { label: 'Reminders', path: '/reminders', icon: Pill, badge: undefined as number | undefined },
     { label: 'Alerts', path: '/notifications', icon: Bell, badge: unreadCount > 0 ? unreadCount : undefined },
   ];
 

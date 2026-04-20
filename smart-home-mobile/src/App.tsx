@@ -5,6 +5,7 @@ import { Rooms } from './pages/Rooms';
 import { RoomDetail } from './pages/RoomDetail';
 import { Notifications } from './pages/Notifications';
 import { Splash } from './pages/Splash';
+import { Reminders } from './pages/Reminders';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
           <Route path="rooms" element={<Rooms />} />
           <Route path="rooms/:roomId" element={<RoomDetail />} />
           <Route path="notifications" element={<Notifications />} />
+          <Route path="reminders" element={<Reminders />} />
         </Route>
       </Routes>
     </BrowserRouter>
