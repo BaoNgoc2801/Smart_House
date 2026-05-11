@@ -32,3 +32,38 @@ export async function triggerPrediction(req: { household: string; time_only?: st
   if (!res.ok) throw new Error('Failed to trigger prediction');
   return res.json() as Promise<PredictionPayload>;
 }
+export async function fetchPredictions(householdId: string) {
+  const res = await fetch(`${API_BASE_URL}/predictions/${householdId}`);
+  if (!res.ok) throw new Error('Failed to fetch predictions');
+  return res.json();
+}
+
+export async function fetchHouseholds() {
+  const res = await fetch(`${API_BASE_URL}/households`);
+  if (!res.ok) throw new Error('Failed to fetch households');
+  return res.json();
+}
+
+export async function fetchSensors(householdId: string) {
+  const res = await fetch(`${API_BASE_URL}/households/${householdId}/sensors`);
+  if (!res.ok) throw new Error('Failed to fetch sensors');
+  return res.json();
+}
+
+export async function fetchAlerts(householdId: string) {
+  const res = await fetch(`${API_BASE_URL}/households/${householdId}/alerts`);
+  if (!res.ok) throw new Error('Failed to fetch alerts');
+  return res.json();
+}
+
+export async function markAlertRead(alertId: number) {
+  const res = await fetch(`${API_BASE_URL}/alerts/${alertId}/read`, { method: 'PATCH' });
+  if (!res.ok) throw new Error('Failed to mark alert as read');
+  return res.json();
+}
+
+export async function fetchHouseholdModel(householdId: string) {
+  const res = await fetch(`${API_BASE_URL}/households/${householdId}/model`);
+  if (!res.ok) throw new Error('Failed to fetch household model');
+  return res.json();
+}

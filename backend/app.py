@@ -11,7 +11,9 @@ import joblib
 import pandas as pd
 import numpy as np
 import httpx
+from datetime import timezone
 
+from .supabase_client import supabase
 from fastapi import (
     FastAPI,
     HTTPException,
@@ -829,6 +831,28 @@ def get_devices_state(household: str) -> Dict[str, Any]:
     return {"household": household, "devices": DEVICE_STATES.get(household, {})}
 
 
+def count_wakeup_episodes(group: pd.DataFrame, wakeup_acts: list, gap_minutes: int = 15) -> int:
+    """Count distinct wakeup episodes by merging rows within gap_minutes of each other."""
+    wakeup_rows = group[group['Activity'].isin(wakeup_acts)].sort_values('_ts')
+    if len(wakeup_rows) == 0:
+        return 0
+
+    gap_seconds = gap_minutes * 60
+    episodes = 0
+    previous_ts = None
+
+    for ts in wakeup_rows['_ts']:
+        if previous_ts is None:
+            episodes += 1
+        else:
+            diff_seconds = (ts - previous_ts).total_seconds()
+            if diff_seconds > gap_seconds:
+                episodes += 1
+        previous_ts = ts
+
+    return episodes
+
+
 @app.get("/dashboard/{household}")
 def get_dashboard_data(household: str) -> Dict[str, Any]:
     if household not in HOUSEHOLDS:
@@ -865,12 +889,30 @@ def get_dashboard_data(household: str) -> Dict[str, Any]:
         if 'Activity' not in df_valid.columns:
             raise HTTPException(status_code=500, detail="Activity column not found in dataset")
 
+        # Filter to April only
+        df_valid = df_valid[df_valid['_ts'].dt.month == 4].copy()
+
+        if len(df_valid) == 0:
+            return {
+                "sitting": [],
+                "walking": [],
+                "wakeup": [],
+                "sleeping": [],
+                "alerts": ["No April data available for this household."]
+            }
+
         # Define activity groups
         sitting_acts = ['Watch_TV', 'Read', 'Work_On_Computer', 'Work_At_Table', 'Phone']
         active_acts = ['Cook_Dinner', 'Wash_Dishes', 'Personal_Hygiene', 'Dress',
                        'Wash_Breakfast_Dishes', 'Wash_Dinner_Dishes', 'Work']
         sleep_acts = ['Sleep', 'Sleep_Out_Of_Bed']
-        wakeup_acts = ['Bed_Toilet_Transition']
+        wakeup_acts = [
+            'Bed_Toilet_Transition',
+            'Night Activity',
+            'Night_Activity',
+            'Wakeup',
+            'Wake Up'
+        ]
 
         # Group by Date
         daily_stats = df_valid.groupby('Date').apply(
@@ -878,13 +920,13 @@ def get_dashboard_data(household: str) -> Dict[str, Any]:
                 'Sitting_Duration': g.loc[g['Activity'].isin(sitting_acts), 'Event_Duration'].sum() / 3600.0,
                 'Walking_Duration': g.loc[g['Activity'].isin(active_acts), 'Event_Duration'].sum() / 3600.0,
                 'Sleeping_Duration': g.loc[g['Activity'].isin(sleep_acts), 'Event_Duration'].sum() / 3600.0,
-                'Wakeup_Count': len(g[g['Activity'].isin(wakeup_acts)]),
+                'Wakeup_Count': count_wakeup_episodes(g, wakeup_acts, gap_minutes=15),
             }),
             include_groups=False,
         ).reset_index()
 
-        # Get last 30 days
-        daily_stats = daily_stats.sort_values('Date').tail(30).reset_index(drop=True)
+        # Sort April dates (all in same month, MM-DD sort is correct)
+        daily_stats = daily_stats.sort_values('Date').reset_index(drop=True)
 
         sitting, walking, wakeup, sleeping, alerts = [], [], [], [], []
 
@@ -905,11 +947,11 @@ def get_dashboard_data(household: str) -> Dict[str, Any]:
                 alerts.append(f"Low active duration ({w_val:.1f}h) on {day_str}.")
             walking.append({"day": day_str, "value": round(w_val, 2), "isAnomaly": w_anom})
 
-            # Wakeup
-            wu_val = float(row['Wakeup_Count'])
-            wu_anom = wu_val > 3
+            # Wakeup (estimated episodes)
+            wu_val = int(row['Wakeup_Count'])
+            wu_anom = wu_val >= 3
             if wu_anom:
-                alerts.append(f"High wakeup count ({int(wu_val)}) on {day_str}.")
+                alerts.append(f"High estimated wakeup episodes ({wu_val}) on {day_str}.")
             wakeup.append({"day": day_str, "value": wu_val, "isAnomaly": wu_anom})
 
             # Sleeping
@@ -986,6 +1028,55 @@ async def predict(req: PredictRequest) -> Dict[str, Any]:
             detail="Provide one of: time_only (HH:MM or HH:MM:SS), index, timestamp, or (date + time)."
         )
 
+    # Prepare insert into Supabase
+    if supabase:
+        try:
+            # Get household id
+            hh_res = supabase.table("HOUSEHOLD").select("id").eq("name", household).execute()
+            if hh_res.data:
+                hh_id = hh_res.data[0]["id"]
+                
+                # Get a sensor for this household
+                sensor_res = supabase.table("SENSOR").select("id").eq("household_id", hh_id).limit(1).execute()
+                if sensor_res.data:
+                    sensor_id = sensor_res.data[0]["id"]
+                else:
+                    # Create a default sensor if none exists
+                    new_sensor = supabase.table("SENSOR").insert({
+                        "household_id": hh_id,
+                        "sensor_code": "DEFAULT_01",
+                        "type": "Demo",
+                        "room": "General"
+                    }).execute()
+                    sensor_id = new_sensor.data[0]["id"]
+                
+                # Insert SENSOR_EVENT
+                # out['matched_timestamp'] might be a string. fallback to current time
+                event_ts = out.get("matched_timestamp") or datetime.now(timezone.utc).isoformat()
+                try:
+                    ts_parsed = pd.to_datetime(event_ts)
+                    event_ts = ts_parsed.isoformat()
+                except:
+                    event_ts = datetime.now(timezone.utc).isoformat()
+
+                event_res = supabase.table("SENSOR_EVENT").insert({
+                    "sensor_id": sensor_id,
+                    "timestamp": event_ts,
+                    "state": "N/A"
+                }).execute()
+                
+                if event_res.data:
+                    event_id = event_res.data[0]["id"]
+                    
+                    # Insert ACTIVITY_PREDICTION
+                    supabase.table("ACTIVITY_PREDICTION").insert({
+                        "event_id": event_id,
+                        "activity_label": out.get("activity"),
+                        "confidence": out.get("confidence")
+                    }).execute()
+        except Exception as e:
+            print(f"Supabase insert error in /predict: {e}")
+
     await ws_broadcast(household, {"type": "prediction", "payload": out})
 
     if out.get("activity") == "Sleep" and (out.get("confidence") or 0) >= 0.75:
@@ -1005,6 +1096,19 @@ async def devices_command(req: DeviceCommandRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"Invalid household: {req.household}. Must be one of {HOUSEHOLDS}")
 
     new_state = apply_command(req)
+
+    if supabase:
+        try:
+            hh_res = supabase.table("HOUSEHOLD").select("id").eq("name", req.household).execute()
+            if hh_res.data:
+                hh_id = hh_res.data[0]["id"]
+                supabase.table("ALERT").insert({
+                    "household_id": hh_id,
+                    "alert_type": "Command",
+                    "message": f"Device {req.device} set to {new_state}"
+                }).execute()
+        except Exception as e:
+            print(f"Supabase insert error in /devices/command: {e}")
 
     await ws_broadcast(
         req.household,
@@ -1059,3 +1163,93 @@ def clear_training_results() -> Dict[str, Any]:
     if TRAINING_RESULTS_FILE.exists():
         TRAINING_RESULTS_FILE.unlink()
     return {"status": "cleared"}
+
+# =========================
+# Supabase Endpoints
+# =========================
+
+@app.get("/predictions/{household_id}")
+def get_predictions(household_id: str, limit: int = 50) -> Dict[str, Any]:
+    if not supabase:
+        return {"status": "error", "message": "Supabase not configured", "predictions": []}
+    try:
+        hh_res = supabase.table("HOUSEHOLD").select("id").eq("name", household_id).execute()
+        if not hh_res.data:
+            return {"status": "error", "message": "Household not found in Supabase", "predictions": []}
+        hh_id = hh_res.data[0]["id"]
+        
+        # We need predictions linked to this household's sensors
+        # A simpler query: get predictions, inner join event, inner join sensor
+        # Supabase Python client join syntax:
+        res = supabase.table("ACTIVITY_PREDICTION") \
+            .select("id, activity_label, confidence, predicted_at, SENSOR_EVENT!inner(id, timestamp, SENSOR!inner(household_id))") \
+            .eq("SENSOR_EVENT.SENSOR.household_id", hh_id) \
+            .order("predicted_at", desc=True) \
+            .limit(limit) \
+            .execute()
+            
+        return {"status": "ok", "predictions": res.data}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "predictions": []}
+
+@app.get("/households")
+def get_households() -> Dict[str, Any]:
+    if not supabase:
+        return {"status": "error", "message": "Supabase not configured", "households": []}
+    try:
+        res = supabase.table("HOUSEHOLD").select("*").execute()
+        return {"status": "ok", "households": res.data}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "households": []}
+
+@app.get("/households/{household_id}/sensors")
+def get_sensors(household_id: str) -> Dict[str, Any]:
+    if not supabase:
+        return {"status": "error", "message": "Supabase not configured", "sensors": []}
+    try:
+        hh_res = supabase.table("HOUSEHOLD").select("id").eq("name", household_id).execute()
+        if not hh_res.data:
+            return {"status": "error", "message": "Household not found in Supabase", "sensors": []}
+        hh_id = hh_res.data[0]["id"]
+        res = supabase.table("SENSOR").select("*").eq("household_id", hh_id).execute()
+        return {"status": "ok", "sensors": res.data}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "sensors": []}
+
+@app.get("/households/{household_id}/alerts")
+def get_alerts(household_id: str, limit: int = 50) -> Dict[str, Any]:
+    if not supabase:
+        return {"status": "error", "message": "Supabase not configured", "alerts": []}
+    try:
+        hh_res = supabase.table("HOUSEHOLD").select("id").eq("name", household_id).execute()
+        if not hh_res.data:
+            return {"status": "error", "message": "Household not found in Supabase", "alerts": []}
+        hh_id = hh_res.data[0]["id"]
+        res = supabase.table("ALERT").select("*").eq("household_id", hh_id).order("triggered_at", desc=True).limit(limit).execute()
+        return {"status": "ok", "alerts": res.data}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "alerts": []}
+
+@app.patch("/alerts/{alert_id}/read")
+def mark_alert_read(alert_id: int) -> Dict[str, Any]:
+    if not supabase:
+        return {"status": "error", "message": "Supabase not configured"}
+    try:
+        res = supabase.table("ALERT").update({"is_read": True}).eq("id", alert_id).execute()
+        return {"status": "ok", "alert": res.data[0] if res.data else None}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/households/{household_id}/model")
+def get_household_model(household_id: str) -> Dict[str, Any]:
+    if not supabase:
+        return {"status": "error", "message": "Supabase not configured", "model": None}
+    try:
+        hh_res = supabase.table("HOUSEHOLD").select("id").eq("name", household_id).execute()
+        if not hh_res.data:
+            return {"status": "error", "message": "Household not found in Supabase", "model": None}
+        hh_id = hh_res.data[0]["id"]
+        res = supabase.table("HOUSEHOLD_MODEL").select("*").eq("household_id", hh_id).order("trained_at", desc=True).limit(1).execute()
+        return {"status": "ok", "model": res.data[0] if res.data else None}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "model": None}

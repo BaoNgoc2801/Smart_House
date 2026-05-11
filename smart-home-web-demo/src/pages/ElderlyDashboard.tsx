@@ -8,11 +8,30 @@ export function ElderlyDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Supabase Data
+  const [predictions, setPredictions] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [sensors, setSensors] = useState<any[]>([]);
+  const [modelInfo, setModelInfo] = useState<any>(null);
 
   useEffect(() => {
-    fetchElderlyDashboardData('Patient A')
-      .then(res => {
-        setData(res);
+    const householdId = 'hh124'; // Using patient A's household
+    
+    Promise.all([
+      fetchElderlyDashboardData('Patient A'),
+      // Fetching new Supabase API endpoints
+      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/predictions/${householdId}`).then(res => res.json()),
+      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/households/${householdId}/alerts`).then(res => res.json()),
+      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/households/${householdId}/sensors`).then(res => res.json()),
+      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/households/${householdId}/model`).then(res => res.json())
+    ])
+      .then(([dashboardRes, predsRes, alertsRes, sensorsRes, modelRes]) => {
+        setData(dashboardRes);
+        if (predsRes.status === 'ok') setPredictions(predsRes.predictions || []);
+        if (alertsRes.status === 'ok') setAlerts(alertsRes.alerts || []);
+        if (sensorsRes.status === 'ok') setSensors(sensorsRes.sensors || []);
+        if (modelRes.status === 'ok') setModelInfo(modelRes.model || null);
         setLoading(false);
       })
       .catch(err => {
@@ -172,6 +191,62 @@ export function ElderlyDashboard() {
             {renderChart(data.walking, "Walking Duration", Footprints, "Walking Duration")}
             {renderChart(data.wakeup, "Wakeup Count", Bed, "Wakeup Count")}
             {renderChart(data.sleeping, "Sleeping Duration", Moon, "Sleeping Duration")}
+          </div>
+        </div>
+      </div>
+
+      {/* Supabase Data Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+        {/* Supabase Predictions */}
+        <div className="bg-white border border-slate-200 rounded-md p-4 shadow-sm">
+          <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Recent Predictions (Supabase)</h3>
+          <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+            {predictions.length > 0 ? (
+              predictions.slice(0, 10).map((p: any) => (
+                <div key={p.id} className="flex justify-between items-center p-2 bg-slate-50 rounded border">
+                  <div>
+                    <p className="font-semibold text-sm">{p.activity_label}</p>
+                    <p className="text-xs text-slate-500">
+                      {new Date(p.predicted_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono bg-purple-100 text-purple-700 px-2 py-1 rounded">
+                    {Math.round(p.confidence * 100)}%
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-slate-500">No predictions found.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Supabase Alerts & Model Info */}
+        <div className="flex flex-col gap-4">
+          <div className="bg-white border border-slate-200 rounded-md p-4 shadow-sm">
+            <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Supabase Alerts</h3>
+            <div className="flex flex-col gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+              {alerts.length > 0 ? (
+                alerts.slice(0, 5).map((a: any) => (
+                  <div key={a.id} className={`p-2 rounded border text-sm ${a.is_read ? 'bg-slate-50' : 'bg-red-50 border-red-200'}`}>
+                    <p className="font-semibold">{a.alert_type}</p>
+                    <p>{a.message}</p>
+                    <p className="text-xs text-slate-500 mt-1">{new Date(a.triggered_at).toLocaleString()}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">No alerts found.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-md p-4 shadow-sm flex-1">
+            <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Model & Sensor Info</h3>
+            <div className="text-sm">
+              <p><strong>Active Model:</strong> {modelInfo ? modelInfo.version || 'v1.0' : 'N/A'}</p>
+              <p><strong>Accuracy:</strong> {modelInfo ? `${(modelInfo.accuracy * 100).toFixed(2)}%` : 'N/A'}</p>
+              <p><strong>Sensors Deployed:</strong> {sensors.length}</p>
+            </div>
           </div>
         </div>
       </div>
