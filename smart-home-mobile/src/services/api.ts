@@ -35,3 +35,15 @@ export async function triggerPrediction(req: { household: string; time_only?: st
   if (!res.ok) throw new Error('Failed to trigger prediction');
   return res.json() as Promise<PredictionPayload>;
 }
+
+export async function fetchPredictions(householdId: string) {
+  const res = await fetch(`${API_BASE_URL}/predictions/${householdId}`);
+  if (!res.ok) throw new Error('Failed to fetch predictions');
+  return res.json();
+}
+
+export async function fetchAlerts(householdId: string) {
+  const res = await fetch(`${API_BASE_URL}/households/${householdId}/alerts`);
+  if (!res.ok) throw new Error('Failed to fetch alerts');
+  return res.json();
+}
