@@ -1,13 +1,36 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { Card } from '../components/ui/Card';
 import { Activity, Info, Zap } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { fetchAlerts } from '../services/api';
 
 export function Notifications() {
-  const { notifications, markNotificationRead, markAllRead } = useAppStore();
+  const { notifications, markNotificationRead, markAllRead, household } = useAppStore();
+  const [supabaseAlerts, setSupabaseAlerts] = useState<any[]>([]);
 
-  const unreadCount = useMemo(() => notifications.filter(n => !n.read).length, [notifications]);
+  useEffect(() => {
+    fetchAlerts(household).then(res => {
+      if (res.status === 'ok') setSupabaseAlerts(res.alerts);
+    }).catch(console.error);
+  }, [household]);
+
+  const allNotifications = useMemo(() => {
+    const combined = [...notifications];
+    supabaseAlerts.forEach(alert => {
+      combined.push({
+        id: `supa_${alert.id}`,
+        title: alert.alert_type,
+        body: alert.message,
+        type: alert.alert_type === 'Command' ? 'device' : 'info',
+        timestamp: alert.triggered_at,
+        read: alert.is_read
+      });
+    });
+    return combined.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [notifications, supabaseAlerts]);
+
+  const unreadCount = useMemo(() => allNotifications.filter(n => !n.read).length, [allNotifications]);
 
   return (
     <div className="flex flex-col h-full bg-bg-light max-w-md mx-auto">
@@ -24,7 +47,7 @@ export function Notifications() {
       </header>
       
       <div className="flex flex-col gap-3 p-4 pb-24 flex-1 overflow-y-auto">
-         {notifications.length === 0 ? (
+         {allNotifications.length === 0 ? (
            <div className="text-center mt-20">
              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Info className="text-gray-400" size={32} />
@@ -33,7 +56,7 @@ export function Notifications() {
              <p className="text-gray-500">You don't have any new notifications.</p>
            </div>
          ) : (
-           notifications.map(notif => {
+           allNotifications.map(notif => {
              const isPrediction = notif.type === 'prediction';
              const isDevice = notif.type === 'device';
              
