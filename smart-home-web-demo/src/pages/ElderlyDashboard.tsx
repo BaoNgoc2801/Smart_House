@@ -3,6 +3,7 @@ import { fetchElderlyDashboardData } from '../services/elderlyApi';
 import type { DashboardData } from '../services/elderlyApi';
 import { AlertCircle, Bed, Moon, Users, TrendingUp, Armchair, Footprints } from 'lucide-react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
+import { API_BASE_URL } from '../constants/config';
 
 export function ElderlyDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -21,10 +22,10 @@ export function ElderlyDashboard() {
     Promise.all([
       fetchElderlyDashboardData('Patient A'),
       // Fetching new Supabase API endpoints
-      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/predictions/${householdId}`).then(res => res.json()),
-      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/households/${householdId}/alerts`).then(res => res.json()),
-      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/households/${householdId}/sensors`).then(res => res.json()),
-      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/households/${householdId}/model`).then(res => res.json())
+      fetch(`${API_BASE_URL}/predictions/${householdId}`).then(res => res.json()),
+      fetch(`${API_BASE_URL}/households/${householdId}/alerts`).then(res => res.json()),
+      fetch(`${API_BASE_URL}/households/${householdId}/sensors`).then(res => res.json()),
+      fetch(`${API_BASE_URL}/households/${householdId}/model`).then(res => res.json())
     ])
       .then(([dashboardRes, predsRes, alertsRes, sensorsRes, modelRes]) => {
         setData(dashboardRes);
