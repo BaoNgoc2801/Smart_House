@@ -889,8 +889,10 @@ def get_dashboard_data(household: str) -> Dict[str, Any]:
         if 'Activity' not in df_valid.columns:
             raise HTTPException(status_code=500, detail="Activity column not found in dataset")
 
-        # Filter to April only
-        df_valid = df_valid[df_valid['_ts'].dt.month == 4].copy()
+        # Filter to the most recent month available in the dataset
+        latest_month = df_valid['_ts'].dt.to_period('M').max()
+        df_valid = df_valid[df_valid['_ts'].dt.to_period('M') == latest_month].copy()
+        month_label = latest_month.strftime('%B %Y')  # e.g. "April 2025"
 
         if len(df_valid) == 0:
             return {
@@ -898,7 +900,8 @@ def get_dashboard_data(household: str) -> Dict[str, Any]:
                 "walking": [],
                 "wakeup": [],
                 "sleeping": [],
-                "alerts": ["No April data available for this household."]
+                "month_label": "N/A",
+                "alerts": ["No data available for this household."]
             }
 
         # Define activity groups
@@ -925,7 +928,7 @@ def get_dashboard_data(household: str) -> Dict[str, Any]:
             include_groups=False,
         ).reset_index()
 
-        # Sort April dates (all in same month, MM-DD sort is correct)
+        # Sort dates within the same month (MM-DD sort is correct for single-month data)
         daily_stats = daily_stats.sort_values('Date').reset_index(drop=True)
 
         sitting, walking, wakeup, sleeping, alerts = [], [], [], [], []
@@ -966,6 +969,7 @@ def get_dashboard_data(household: str) -> Dict[str, Any]:
             "walking": walking,
             "wakeup": wakeup,
             "sleeping": sleeping,
+            "month_label": month_label,
             "alerts": alerts[-4:] if alerts else ["No recent anomalies detected."]
         }
 

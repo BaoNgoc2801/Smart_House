@@ -10,6 +10,7 @@ export interface DashboardData {
   walking: ActivityData[];
   wakeup: ActivityData[];
   sleeping: ActivityData[];
+  month_label: string;
   alerts: string[];
 }
 

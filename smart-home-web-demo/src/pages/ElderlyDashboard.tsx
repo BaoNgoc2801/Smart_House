@@ -128,7 +128,7 @@ export function ElderlyDashboard() {
             {/* April badge */}
             <div className="flex items-center gap-1 mt-1 bg-white/20 rounded px-2 py-0.5 w-fit text-xs font-semibold">
               <CalendarDays className="w-3.5 h-3.5" />
-              <span>April 2025</span>
+              <span>{data.month_label}</span>
             </div>
           </div>
         </div>
