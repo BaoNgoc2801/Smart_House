@@ -1,41 +1,21 @@
 import { useEffect, useState } from 'react';
 import { fetchElderlyDashboardData } from '../services/elderlyApi';
 import type { DashboardData } from '../services/elderlyApi';
-import { AlertCircle, Bed, Moon, Users, TrendingUp, Armchair, Footprints } from 'lucide-react';
+import { AlertCircle, Bed, Moon, Users, TrendingUp, Armchair, Footprints, CalendarDays } from 'lucide-react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
-import { API_BASE_URL } from '../constants/config';
 
 export function ElderlyDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Supabase Data
-  const [predictions, setPredictions] = useState<any[]>([]);
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [sensors, setSensors] = useState<any[]>([]);
-  const [modelInfo, setModelInfo] = useState<any>(null);
 
   useEffect(() => {
-    const householdId = 'hh124'; // Using patient A's household
-    
-    Promise.all([
-      fetchElderlyDashboardData('Patient A'),
-      // Fetching new Supabase API endpoints
-      fetch(`${API_BASE_URL}/predictions/${householdId}`).then(res => res.json()),
-      fetch(`${API_BASE_URL}/households/${householdId}/alerts`).then(res => res.json()),
-      fetch(`${API_BASE_URL}/households/${householdId}/sensors`).then(res => res.json()),
-      fetch(`${API_BASE_URL}/households/${householdId}/model`).then(res => res.json())
-    ])
-      .then(([dashboardRes, predsRes, alertsRes, sensorsRes, modelRes]) => {
-        setData(dashboardRes);
-        if (predsRes.status === 'ok') setPredictions(predsRes.predictions || []);
-        if (alertsRes.status === 'ok') setAlerts(alertsRes.alerts || []);
-        if (sensorsRes.status === 'ok') setSensors(sensorsRes.sensors || []);
-        if (modelRes.status === 'ok') setModelInfo(modelRes.model || null);
+    fetchElderlyDashboardData('Patient A')
+      .then((res) => {
+        setData(res);
         setLoading(false);
       })
-      .catch(err => {
+      .catch((err) => {
         const msg = err?.message ?? 'Failed to load dashboard data';
         setError(msg);
         console.error('[Dashboard]', msg);
@@ -43,14 +23,15 @@ export function ElderlyDashboard() {
       });
   }, []);
 
-  if (loading || !data) {
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center h-full min-h-[400px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      );
-    }
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!data) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 max-w-md text-center">
@@ -79,29 +60,29 @@ export function ElderlyDashboard() {
         <div className="bg-blue-600 text-white px-3 py-1.5 text-xs font-bold">
           {title}
         </div>
-        
+
         {/* Chart Body */}
         <div className="p-2 h-48 relative">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-              <XAxis 
-                dataKey="day" 
+              <XAxis
+                dataKey="day"
                 tick={{ fontSize: 10 }}
                 axisLine={true}
                 tickLine={false}
                 interval={4}
               />
-              <Tooltip 
+              <Tooltip
                 cursor={{ fill: 'transparent' }}
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
-                    const data = payload[0].payload;
+                    const entry = payload[0].payload;
                     return (
                       <div className="bg-white border border-slate-200 p-2 shadow-md rounded text-xs">
-                        <p className="font-bold">Day {data.day}</p>
-                        <p>Value: {Number(data.value).toFixed(2)}</p>
-                        {data.isAnomaly && (
+                        <p className="font-bold">{entry.day}</p>
+                        <p>Value: {Number(entry.value).toFixed(2)}</p>
+                        {entry.isAnomaly && (
                           <p className="text-red-500 font-bold mt-1">Anomaly Detected!</p>
                         )}
                       </div>
@@ -121,7 +102,7 @@ export function ElderlyDashboard() {
             Day
           </div>
         </div>
-        
+
         {/* Chart Footer */}
         <div className="bg-blue-50/50 flex items-center justify-center gap-2 py-2 border-t border-slate-100">
           <Icon className="w-4 h-4 text-slate-800" />
@@ -133,18 +114,25 @@ export function ElderlyDashboard() {
 
   return (
     <div className="flex flex-col gap-6 font-sans">
-      
+
       {/* Top Navigation Banner */}
       <div className="bg-[#0078FF] text-white rounded-md shadow-md p-4 flex justify-between items-start">
-        <div className="flex items-center gap-2 mt-2">
+        <div className="flex items-center gap-3 mt-2">
           <div className="bg-white/20 p-1.5 rounded">
             <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
               <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold">Elderly Care Dashboard</h1>
+          <div>
+            <h1 className="text-2xl font-bold">Elderly Care Dashboard</h1>
+            {/* April badge */}
+            <div className="flex items-center gap-1 mt-1 bg-white/20 rounded px-2 py-0.5 w-fit text-xs font-semibold">
+              <CalendarDays className="w-3.5 h-3.5" />
+              <span>April 2025</span>
+            </div>
+          </div>
         </div>
-        
+
         <div className="flex flex-col gap-3 font-semibold text-sm">
           <div className="flex items-center gap-2 hover:text-blue-200 cursor-pointer transition-colors">
             <Users className="w-5 h-5" />
@@ -186,68 +174,12 @@ export function ElderlyDashboard() {
             <TrendingUp className="w-6 h-6" />
             <h2>Detailed Activity Monitoring</h2>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {renderChart(data.sitting, "Sitting Duration", Armchair, "Sitting Duration")}
-            {renderChart(data.walking, "Walking Duration", Footprints, "Walking Duration")}
-            {renderChart(data.wakeup, "Wakeup Count", Bed, "Wakeup Count")}
-            {renderChart(data.sleeping, "Sleeping Duration", Moon, "Sleeping Duration")}
-          </div>
-        </div>
-      </div>
-
-      {/* Supabase Data Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-        {/* Supabase Predictions */}
-        <div className="bg-white border border-slate-200 rounded-md p-4 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Recent Predictions (Supabase)</h3>
-          <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-            {predictions.length > 0 ? (
-              predictions.slice(0, 10).map((p: any) => (
-                <div key={p.id} className="flex justify-between items-center p-2 bg-slate-50 rounded border">
-                  <div>
-                    <p className="font-semibold text-sm">{p.activity_label}</p>
-                    <p className="text-xs text-slate-500">
-                      {new Date(p.predicted_at).toLocaleString()}
-                    </p>
-                  </div>
-                  <span className="text-xs font-mono bg-purple-100 text-purple-700 px-2 py-1 rounded">
-                    {Math.round(p.confidence * 100)}%
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate-500">No predictions found.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Supabase Alerts & Model Info */}
-        <div className="flex flex-col gap-4">
-          <div className="bg-white border border-slate-200 rounded-md p-4 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Supabase Alerts</h3>
-            <div className="flex flex-col gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
-              {alerts.length > 0 ? (
-                alerts.slice(0, 5).map((a: any) => (
-                  <div key={a.id} className={`p-2 rounded border text-sm ${a.is_read ? 'bg-slate-50' : 'bg-red-50 border-red-200'}`}>
-                    <p className="font-semibold">{a.alert_type}</p>
-                    <p>{a.message}</p>
-                    <p className="text-xs text-slate-500 mt-1">{new Date(a.triggered_at).toLocaleString()}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">No alerts found.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-md p-4 shadow-sm flex-1">
-            <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Model & Sensor Info</h3>
-            <div className="text-sm">
-              <p><strong>Active Model:</strong> {modelInfo ? modelInfo.version || 'v1.0' : 'N/A'}</p>
-              <p><strong>Accuracy:</strong> {modelInfo ? `${(modelInfo.accuracy * 100).toFixed(2)}%` : 'N/A'}</p>
-              <p><strong>Sensors Deployed:</strong> {sensors.length}</p>
-            </div>
+            {renderChart(data.sitting, 'Sitting Duration', Armchair, 'Sitting Duration')}
+            {renderChart(data.walking, 'Walking Duration', Footprints, 'Walking Duration')}
+            {renderChart(data.wakeup, 'Wakeup Count', Bed, 'Wakeup Count')}
+            {renderChart(data.sleeping, 'Sleeping Duration', Moon, 'Sleeping Duration')}
           </div>
         </div>
       </div>
