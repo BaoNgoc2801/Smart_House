@@ -64,15 +64,15 @@ export function Notifications() {
                <Card 
                  key={notif.id} 
                  className={cn(
-                   "p-4 cursor-pointer relative overflow-hidden transition-colors border",
+                   "p-4 cursor-pointer relative transition-colors border",
                    notif.read ? "bg-white border-transparent shadow-sm" : "bg-primary-50 border-primary-100 shadow-md",
                  )}
                  onClick={() => !notif.read && markNotificationRead(notif.id)}
                >
                  {!notif.read && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary-500" />
+                    <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary-500 rounded-l-3xl" />
                  )}
-                 <div className="flex gap-4">
+                 <div className="flex gap-4 pl-1">
                     <div className={cn(
                       "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
                       isPrediction ? "bg-purple-100 text-purple-600" : 
@@ -89,7 +89,7 @@ export function Notifications() {
                            {new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                          </span>
                        </div>
-                       <p className={cn("text-sm line-clamp-2", notif.read ? "text-gray-500" : "text-gray-700")}>
+                       <p className={cn("text-sm", notif.read ? "text-gray-500" : "text-gray-700")}>
                          {notif.body}
                        </p>
                     </div>
