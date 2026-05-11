@@ -22,7 +22,7 @@ export function Notifications() {
         id: `supa_${alert.id}`,
         title: alert.alert_type,
         body: alert.message,
-        type: alert.alert_type === 'Command' ? 'device' : 'info',
+        type: alert.alert_type === 'Command' ? 'device' : 'system',
         timestamp: alert.triggered_at,
         read: alert.is_read
       });
